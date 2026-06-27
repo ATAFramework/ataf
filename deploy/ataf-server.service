@@ -1,0 +1,21 @@
+[Unit]
+Description=ATAF Server (Agent Tool Acquisition Framework)
+After=network.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+WorkingDirectory=/home/rajramani/ataf
+Environment=ATAF_HOST=0.0.0.0
+Environment=ATAF_PORT=9123
+Environment=ATAF_DATA_DIR=/home/rajramani/ataf/ataf_data
+# Set to 1 only for demos — lets PENDING_REVIEW tools be invoked without approval.
+Environment=ATAF_ALLOW_PENDING=0
+ExecStartPre=/bin/sleep 5
+ExecStartPre=-/usr/bin/fuser -k 9123/tcp
+ExecStart=/home/rajramani/ataf/.venv/bin/python -m ataf.server.main
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

@@ -54,6 +54,7 @@ coverage.xml
 *.sqlite
 *.sqlite3
 data/
+ataf_data/
 
 # Environment
 .env

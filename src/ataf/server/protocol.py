@@ -197,7 +197,8 @@ class ErrorResponse(BaseModel):
     Attributes:
         error: A machine-readable error code, e.g.
             ``"TOOL_NOT_AUTHORIZED"``, ``"TOOL_EXECUTION_ERROR"``,
-            ``"VALIDATION_FAILED"``.
+            ``"VALIDATION_FAILED"``, ``"TOOL_NOT_DEPLOYED"`` (valid code
+            that the server failed to deploy — retryable).
         message: Human-readable explanation. Safe to surface to an LLM
             as a tool-result so it can decide how to handle the failure.
     """
