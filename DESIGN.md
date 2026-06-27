@@ -151,7 +151,7 @@ until the build completes, then returns the refreshed catalog.
       "tool_id": "circle_area_v1",
       "name": "circle_area",
       "description": "Compute the area of a circle.",
-      "schema": {
+      "input_schema": {
         "type": "object",
         "properties": { "radius": { "type": "number" } },
         "required": ["radius"]
@@ -187,7 +187,7 @@ Submit a new tool for deployment.
 {
   "status": "DEPLOYED",
   "tool_id": "circle_area_v1",
-  "schema": { ... },
+  "input_schema": { ... },
   "invoke_uri": "/tools/circle_area_v1/invoke",
   "tool_status": "PENDING_REVIEW",
   "catalog_version": 43
@@ -408,29 +408,66 @@ server/
   admin_cli.py         # `ataf-admin approve|reject|list`
 ```
 
-### 8.2 Tool Registry (SQLite schema)
+### 8.2 Tool Registry (SQLite metadata + filesystem code)
 
+ATAF persists state in **two complementary layers**:
+
+**Layer 1 — Filesystem** (the source of truth for code):
+```
+ataf_data/                       # configurable root, default ./ataf_data/
+  ataf.sqlite                    # metadata index
+  tools/
+    circle_area_v1.py            # the actual generated tool code
+    rectangle_area_v1.py
+  logs/
+    deployment.jsonl             # one event per line
+```
+
+Generated tool code lives as readable `.py` files. Humans can inspect,
+diff, git-track, or manually edit them. The filename is the `tool_id`.
+
+**Layer 2 — SQLite** (metadata + state):
 ```sql
 CREATE TABLE tools (
-  tool_id         TEXT PRIMARY KEY,
-  name            TEXT NOT NULL,
-  description     TEXT NOT NULL,
-  code            TEXT NOT NULL,
-  schema_json     TEXT NOT NULL,
-  status          TEXT NOT NULL DEFAULT 'PENDING_REVIEW',
-  intent          TEXT,
-  created_at      TEXT NOT NULL,
+  tool_id          TEXT PRIMARY KEY,
+  name             TEXT NOT NULL,        -- LLM-given function name
+  description      TEXT NOT NULL,        -- first line of docstring
+  code_path        TEXT NOT NULL,        -- relative path under ataf_data/tools/
+  code_sha256      TEXT NOT NULL,        -- integrity check on load
+  schema_json      TEXT NOT NULL,        -- generated JSON schema for invocation
+  status           TEXT NOT NULL DEFAULT 'PENDING_REVIEW',
+  intent           TEXT,                 -- LLM/agent's stated intent at propose-time
+  created_at       TEXT NOT NULL,
   status_updated_at TEXT,
-  call_count      INTEGER DEFAULT 0,
-  last_called_at  TEXT
+  call_count       INTEGER DEFAULT 0,
+  last_called_at   TEXT
 );
 
 CREATE INDEX idx_status ON tools(status);
 CREATE INDEX idx_name ON tools(name);
 ```
 
-On server startup, every tool is re-imported into a fresh namespace and
-its FastAPI route re-registered. The catalog survives restarts.
+On server startup, the registry reads every row, re-loads the
+corresponding `.py` file, verifies `code_sha256`, and re-registers the
+FastAPI route. The catalog survives restarts. If a code file is missing
+or its hash doesn't match, the tool is marked `UNAUTHORIZED` and a
+warning is logged — never auto-deleted.
+
+### 8.2.1 Deployment event log
+
+Every state-changing event is appended to `ataf_data/logs/deployment.jsonl`
+as one JSON object per line:
+
+```json
+{"ts": "2026-06-26T18:00:00Z", "event": "propose", "tool_id": "circle_area_v1", "intent": "compute area of a circle", "agent_id": "anon", "code_sha256": "abc..."}
+{"ts": "2026-06-26T18:00:01Z", "event": "deploy", "tool_id": "circle_area_v1", "status": "PENDING_REVIEW", "build_duration_ms": 142}
+{"ts": "2026-06-26T18:05:00Z", "event": "approve", "tool_id": "circle_area_v1", "actor": "rajesh"}
+{"ts": "2026-06-26T18:10:00Z", "event": "invoke_denied", "tool_id": "circle_area_v1", "reason": "TOOL_NOT_AUTHORIZED"}
+```
+
+This log is the audit trail for everything that goes through the
+acquisition path. Tool *invocations* of authorized tools are logged
+separately (or not at all in v0.1 — that's v0.2 observability work).
 
 ### 8.3 Tool Executor (v0.1)
 
