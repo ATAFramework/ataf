@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ATAF — Agent Tool Acquisition Framework</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<style>
+  :root {
+    --bg: #ffffff;
+    --fg: #1a1f29;
+    --muted: #5b6473;
+    --accent: #2b6cb0;
+    --accent-soft: #ebf2fb;
+    --border: #e2e6ec;
+    --code-bg: #f6f8fa;
+    --ok: #2f855a;
+    --ok-soft: #e9f6ee;
+    --warn: #b7791f;
+    --warn-soft: #fdf6e7;
+    --bad: #c53030;
+    --bad-soft: #fcebea;
+  }
+
+  * { box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.65;
+    font-size: 16px;
+  }
+
+  .layout { display: flex; max-width: 1180px; margin: 0 auto; }
+
+  /* Sidebar nav */
+  nav {
+    position: sticky;
+    top: 0;
+    align-self: flex-start;
+    width: 230px;
+    height: 100vh;
+    overflow-y: auto;
+    padding: 32px 18px;
+    border-right: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  nav .brand { font-weight: 700; font-size: 18px; margin-bottom: 4px; }
+  nav .tag { color: var(--muted); font-size: 12px; margin-bottom: 22px; }
+  nav a {
+    display: block;
+    color: var(--muted);
+    text-decoration: none;
+    font-size: 14px;
+    padding: 5px 10px;
+    border-radius: 6px;
+    margin-bottom: 2px;
+  }
+  nav a:hover { background: var(--accent-soft); color: var(--accent); }
+
+  main { flex: 1; min-width: 0; padding: 40px 48px 120px; }
+
+  header.hero {
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 28px;
+    margin-bottom: 8px;
+  }
+  header.hero h1 { font-size: 34px; margin: 0 0 6px; letter-spacing: -0.5px; }
+  header.hero .sub { font-size: 18px; color: var(--muted); margin: 0; }
+  .pills { margin-top: 18px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .pill {
+    font-size: 12.5px;
+    padding: 4px 12px;
+    border-radius: 999px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    border: 1px solid #d4e3f5;
+    font-weight: 600;
+  }
+  .pill.ok  { background: var(--ok-soft);  color: var(--ok);  border-color:#c6e8d3; }
+
+  section { padding-top: 46px; }
+  h2 {
+    font-size: 24px;
+    margin: 0 0 4px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid var(--accent-soft);
+    letter-spacing: -0.3px;
+  }
+  h2 .num { color: var(--accent); font-weight: 700; margin-right: 10px; }
+  h3 { font-size: 17px; margin: 28px 0 8px; }
+  p { margin: 10px 0; }
+  .lead { font-size: 17px; color: #2d3440; }
+
+  code {
+    background: var(--code-bg);
+    padding: 2px 6px;
+    border-radius: 5px;
+    font-family: "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+    font-size: 13.5px;
+    color: #233;
+  }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 18px;
+    overflow-x: auto;
+    font-size: 13px;
+    line-height: 1.55;
+  }
+  pre code { background: none; padding: 0; font-size: 13px; }
+
+  /* Diagram cards */
+  .diagram {
+    background: #fcfdfe;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    margin: 18px 0;
+    text-align: center;
+    overflow-x: auto;
+  }
+  .diagram .mermaid { display: inline-block; width: 100%; }
+  /* Fit diagrams to the content column: grow small ones, shrink wide ones,
+     but cap the growth so nothing becomes oversized. */
+  .diagram .mermaid svg { max-width: 100%; height: auto; }
+  .caption { color: var(--muted); font-size: 13px; margin-top: 8px; font-style: italic; }
+
+  /* Cards / callouts */
+  .card {
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--accent);
+    background: #fbfcfe;
+    border-radius: 8px;
+    padding: 14px 18px;
+    margin: 16px 0;
+  }
+  .card.locked { border-left-color: var(--ok); background: var(--ok-soft); }
+  .card .label {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.6px;
+    text-transform: uppercase; color: var(--accent);
+  }
+  .card.locked .label { color: var(--ok); }
+
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin: 18px 0; }
+  .grid2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin: 18px 0; }
+  .tile {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+    background: #fcfdfe;
+  }
+  .tile h4 { margin: 0 0 6px; font-size: 15px; }
+  .tile p { margin: 0; font-size: 13.5px; color: var(--muted); }
+  .tile .ico { font-size: 22px; margin-bottom: 6px; }
+
+  table { border-collapse: collapse; width: 100%; margin: 18px 0; font-size: 14px; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { background: var(--code-bg); font-weight: 600; }
+  tbody tr:hover { background: #fafbfc; }
+
+  .status { font-weight: 600; padding: 2px 9px; border-radius: 6px; font-size: 12.5px; white-space: nowrap; }
+  .status.pending { background: var(--warn-soft); color: var(--warn); }
+  .status.auth    { background: var(--ok-soft);   color: var(--ok); }
+  .status.unauth  { background: var(--bad-soft);  color: var(--bad); }
+
+  .check { color: var(--ok); font-weight: 700; }
+  .todo  { color: var(--muted); }
+
+  footer { margin-top: 60px; padding-top: 22px; border-top: 1px solid var(--border); color: var(--muted); font-size: 13px; }
+
+  @media (max-width: 820px) {
+    nav { display: none; }
+    main { padding: 28px 20px 80px; }
+    .grid3, .grid2 { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+  <nav>
+    <div class="brand">ATAF</div>
+    <div class="tag">Agent Tool Acquisition Framework</div>
+    <a href="#concept">1 · Concept</a>
+    <a href="#architecture">2 · Architecture</a>
+    <a href="#loop">3 · The Loop</a>
+    <a href="#contract">4 · LLM Contract</a>
+    <a href="#protocol">5 · Wire Protocol</a>
+    <a href="#concurrency">6 · Concurrency</a>
+    <a href="#lifecycle">7 · Tool Lifecycle</a>
+    <a href="#governance">8 · Governance</a>
+    <a href="#build">9 · Build · Pipeline</a>
+    <a href="#status">10 · Status</a>
+  </nav>
+
+  <main>
+    <header class="hero">
+      <h1>ATAF</h1>
+      <p class="sub">Agent Tool Acquisition Framework — agents that <strong>acquire new tools at runtime</strong>.</p>
+      <div class="pills">
+        <span class="pill">Design v1 · locked 2026-06-26</span>
+        <span class="pill">Apache-2.0</span>
+        <span class="pill ok">v0.1 in progress</span>
+        <span class="pill">Python · FastAPI · SQLite</span>
+      </div>
+    </header>
+
+    <!-- 1 CONCEPT -->
+    <section id="concept">
+      <h2><span class="num">1</span>Concept</h2>
+      <p class="lead">Every agent framework today — LangChain, CrewAI, the Claude Agent SDK, MCP —
+      assumes the agent's toolset is <strong>hand-curated at build time</strong>. If the agent
+      needs a capability the developer didn't anticipate, the agent fails.</p>
+
+      <div class="card">
+        <div class="label">The insight</div>
+        <p style="margin:6px 0 0">The LLM itself is the best discovery + synthesis engine. Instead of
+        hunting external registries for a missing capability, just ask the LLM to
+        <strong>write the missing tool</strong>, then deploy that tool live so the agent can call it
+        on the very next turn.</p>
+      </div>
+
+      <p>The agent fetches its current tool catalog from an <strong>ATAF server</strong> and asks an
+      LLM how to perform a task. The LLM either picks an existing tool, writes a new Python tool inside
+      <code>&lt;ATAF param="newtool"&gt;…&lt;/ATAF&gt;</code> tags, or declines. On a proposal, the
+      agent forwards the code to the ATAF server, which materializes it into a live FastAPI endpoint
+      and returns the new tool's schema. The agent re-prompts the LLM with the refreshed catalog, and
+      the LLM calls the new tool. <strong>Tools persist indefinitely</strong> and are reusable across
+      every agent talking to that server.</p>
+
+      <div class="grid3">
+        <div class="tile"><div class="ico">🧩</div><h4>Acquire, don't curate</h4><p>Tools materialize on demand from LLM-authored code — no pre-registration.</p></div>
+        <div class="tile"><div class="ico">♻️</div><h4>Persist &amp; share</h4><p>A built tool survives restarts and is reusable by all agents on the server.</p></div>
+        <div class="tile"><div class="ico">🛡️</div><h4>Human-gated</h4><p>New tools start <code>PENDING_REVIEW</code>; a human approves before invocation.</p></div>
+      </div>
+    </section>
+
+    <!-- 2 ARCHITECTURE -->
+    <section id="architecture">
+      <h2><span class="num">2</span>Architecture Overview</h2>
+      <p>Three actors: the <strong>Agent</strong> (client library), the <strong>LLM</strong>, and the
+      <strong>ATAF Server</strong>. The agent is the only party that talks to both of the others.</p>
+
+      <div class="diagram">
+        <pre class="mermaid">
+flowchart TB
+    subgraph AGENT["🤖 Agent — client library"]
+      direction TB
+      A1["Fetch catalog · build prompt"]
+      A2["Parse response: invoke | propose | decline"]
+      A3["Invoke tools · submit new tool code"]
+    end
+
+    subgraph LLM["🧠 LLM — Claude / GPT / …"]
+      L1["Reasoning · tool selection"]
+      L2["Tool-code generation"]
+    end
+
+    subgraph SERVER["⚙️ ATAF Server — FastAPI"]
+      direction TB
+      S1["Registry · SQLite + .py files"]
+      S2["Global build lock + waiters"]
+      S3["Builder · code → live route"]
+      S4["Executor · subprocess per call"]
+    end
+
+    AGENT -- "catalog + task" --> LLM
+    LLM -- "tool call / new code / decline" --> AGENT
+    AGENT -- "GET /tools · POST /propose · POST /invoke" --> SERVER
+    SERVER -- "schema · result · 202 WAIT" --> AGENT
+
+    classDef agent fill:#ebf2fb,stroke:#2b6cb0,color:#1a1f29;
+    classDef llm fill:#f3ecfb,stroke:#7c3aed,color:#1a1f29;
+    classDef server fill:#e9f6ee,stroke:#2f855a,color:#1a1f29;
+    class AGENT,A1,A2,A3 agent;
+    class LLM,L1,L2 llm;
+    class SERVER,S1,S2,S3,S4 server;
+        </pre>
+        <div class="caption">The agent bridges the LLM and the ATAF server; neither of those two ever talks directly.</div>
+      </div>
+
+      <table>
+        <thead><tr><th>Component</th><th>Owns</th><th>Does <em>not</em> own</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Agent</strong></td><td>LLM conversation, tag-protocol parsing, deciding when to propose</td><td>Tool storage, tool execution</td></tr>
+          <tr><td><strong>ATAF Server</strong></td><td>Storage, deployment, execution, concurrency control, governance flags</td><td>LLM calls, prompt engineering</td></tr>
+          <tr><td><strong>LLM</strong></td><td>Reasoning, tool selection, tool-code generation</td><td>Knowledge of deployed tools (must be told each turn)</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- 3 LOOP -->
+    <section id="loop">
+      <h2><span class="num">3</span>The Acquisition Loop</h2>
+      <p>The full end-to-end path when an agent needs a capability that doesn't exist yet.</p>
+
+      <div class="diagram">
+        <pre class="mermaid">
+sequenceDiagram
+    autonumber
+    participant U as User
+    participant Ag as Agent
+    participant AT as ATAF Server
+    participant L as LLM
+    participant H as Human admin
+
+    U->>Ag: task ("area of a circle, r=10")
+    Ag->>AT: GET /tools
+    AT-->>Ag: catalog (no area tool)
+    Ag->>L: task + catalog + tag protocol
+    L-->>Ag: propose &lt;ATAF&gt; circle_area(...) &lt;/ATAF&gt;
+    Ag->>AT: POST /tools/propose { code, intent }
+    Note over AT: acquire build lock<br/>validate · schema · persist
+    AT-->>Ag: 200 DEPLOYED (PENDING_REVIEW)
+    H->>AT: ataf-admin approve circle_area_v1
+    AT-->>H: AUTHORIZED
+    Ag->>AT: GET /tools (refreshed)
+    AT-->>Ag: catalog now includes circle_area_v1
+    Ag->>L: re-prompt with new catalog
+    L-->>Ag: call circle_area { radius: 10 }
+    Ag->>AT: POST /tools/circle_area_v1/invoke
+    AT-->>Ag: { "result": 314.159 }
+    Ag-->>U: "The area is 314.159"
+        </pre>
+        <div class="caption">Propose → deploy → approve → re-use. Steps 7–9 run under the global build lock.</div>
+      </div>
+    </section>
+
+    <!-- 4 CONTRACT -->
+    <section id="contract">
+      <h2><span class="num">4</span>The LLM Contract — Three Responses</h2>
+      <p>The agent's prompt carries the user task, the current catalog (with status flags), and the tag
+      protocol. The LLM must answer in exactly one of three shapes.</p>
+
+      <div class="grid3">
+        <div class="tile"><div class="ico">①</div><h4>Use existing tool</h4><p>A native tool-call in the LLM's own format (Claude <code>tool_use</code>, OpenAI <code>function_call</code>).</p></div>
+        <div class="tile"><div class="ico">②</div><h4>Propose new tool</h4><p>A function inside <code>&lt;ATAF&gt;</code> tags — typed params, return annotation, docstring, stdlib only.</p></div>
+        <div class="tile"><div class="ico">③</div><h4>Decline</h4><p>Cannot do the task and cannot write a tool for it. The agent halts the loop.</p></div>
+      </div>
+
+      <h3>Response ② — the proposal shape</h3>
+      <pre><code>&lt;ATAF param="newtool"&gt;
+def circle_area(radius: float) -&gt; float:
+    """Compute the area of a circle.
+
+    Args:
+        radius: The radius of the circle, in any unit.
+
+    Returns:
+        The area in the squared unit of the radius.
+    """
+    import math
+    return math.pi * radius ** 2
+&lt;/ATAF&gt;</code></pre>
+
+      <div class="card">
+        <div class="label">Hard requirements (v0.1)</div>
+        <p style="margin:6px 0 0">Exactly one top-level function · every parameter type-annotated · a
+        return annotation · a Google/NumPy-style docstring · <strong>imports from the Python standard
+        library only</strong>. The builder rejects anything else with a <code>400</code> and a stable
+        error code.</p>
+      </div>
+    </section>
+
+    <!-- 5 PROTOCOL -->
+    <section id="protocol">
+      <h2><span class="num">5</span>Wire Protocol</h2>
+      <p>All endpoints speak JSON; all timestamps are ISO-8601 UTC.</p>
+      <table>
+        <thead><tr><th>Endpoint</th><th>Purpose</th><th>Notable responses</th></tr></thead>
+        <tbody>
+          <tr><td><code>GET /tools</code></td><td>Fetch the catalog</td><td><strong>Blocks</strong> (long-poll) if a build is in progress, then returns the refreshed list</td></tr>
+          <tr><td><code>POST /tools/propose</code></td><td>Submit new tool code</td><td><code>200 DEPLOYED</code> · <code>202 WAIT</code> (build busy) · <code>400</code> (validation) · <code>500 TOOL_NOT_DEPLOYED</code> (retryable)</td></tr>
+          <tr><td><code>GET /tools/propose/wait/{token}</code></td><td>Long-poll a pending build</td><td><code>200</code> refreshed catalog · <code>408</code> timeout → retry</td></tr>
+          <tr><td><code>POST /tools/{id}/invoke</code></td><td>Call a tool</td><td><code>200</code> result · <code>403 TOOL_NOT_AUTHORIZED</code> · <code>500 TOOL_EXECUTION_ERROR</code></td></tr>
+          <tr><td><code>POST /admin/tools/{id}/approve · /reject</code></td><td>Human review</td><td>Flips status (v0.1 ships the <code>ataf-admin</code> CLI)</td></tr>
+        </tbody>
+      </table>
+
+      <div class="grid2">
+        <div>
+          <h3>Propose → deployed</h3>
+          <pre><code>{
+  "status": "DEPLOYED",
+  "tool_id": "circle_area_v1",
+  "input_schema": { ... },
+  "invoke_uri": "/tools/circle_area_v1/invoke",
+  "tool_status": "PENDING_REVIEW",
+  "catalog_version": 43
+}</code></pre>
+        </div>
+        <div>
+          <h3>Propose → build busy</h3>
+          <pre><code>{
+  "status": "WAIT",
+  "poll_url": "/tools/propose/wait/abc123",
+  "eta_seconds": 5
+}</code></pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- 6 CONCURRENCY -->
+    <section id="concurrency">
+      <h2><span class="num">6</span>Concurrency — One Global Build Lock</h2>
+      <p>Only <strong>one</strong> tool builds at a time, server-wide. Invocation of existing tools is
+      never blocked.</p>
+
+      <div class="diagram">
+        <pre class="mermaid">
+stateDiagram-v2
+    direction LR
+    [*] --> Idle
+    Idle --> Building: propose acquires lock
+    Building --> Idle: deploy done · notify waiters
+
+    state Building {
+      direction LR
+      validate --> schema
+      schema --> persist
+      persist --> register_route
+    }
+        </pre>
+        <div class="caption">A global lock sidesteps "are these the same tool?" — no name normalization, no semantic similarity.</div>
+      </div>
+
+      <div class="card">
+        <div class="label">While a build holds the lock</div>
+        <p style="margin:6px 0 0"><code>POST /tools/propose</code> → <code>202 WAIT</code> &nbsp;·&nbsp;
+        <code>GET /tools</code> → long-poll (blocks until done) &nbsp;·&nbsp;
+        <code>POST /tools/{id}/invoke</code> → proceeds normally (execution is never blocked).</p>
+      </div>
+
+      <div class="grid2">
+        <div class="card locked">
+          <div class="label">Locked · global, not per-tool</div>
+          <p style="margin:6px 0 0">Per-tool locks need to identify "the same tool" across submissions —
+          fragile name normalization or unreliable similarity. Builds are infrequent and sub-second, so a
+          global lock is an acceptable v0.1 trade.</p>
+        </div>
+        <div class="card locked">
+          <div class="label">Locked · no semantic dedup</div>
+          <p style="margin:6px 0 0">If two agents propose <code>circle_area</code> and
+          <code>area_of_circle</code>, both deploy. Duplicates accumulate; <strong>humans prune them</strong>
+          via approve/reject. No false-positive merges.</p>
+        </div>
+      </div>
+
+      <h3>Long-poll mechanics</h3>
+      <p>On <code>202 WAIT</code> the agent polls <code>poll_url</code>. The server holds the connection
+      until the build completes (returns the refreshed catalog) or a 30s timeout (<code>408</code> →
+      retry). On receiving the refreshed catalog, the agent <strong>must re-prompt the LLM</strong>
+      before doing anything else — this refresh is hidden inside the client library, so user code simply
+      sees "the tool list now includes the new tool."</p>
+    </section>
+
+    <!-- 7 LIFECYCLE -->
+    <section id="lifecycle">
+      <h2><span class="num">7</span>Tool Lifecycle</h2>
+      <p>The registry is <strong>append-only with status mutations</strong> — tools are never
+      auto-deleted, which keeps the system inspectable and undoable.</p>
+
+      <div class="diagram">
+        <pre class="mermaid">
+stateDiagram-v2
+    direction LR
+    [*] --> Submitted: agent POSTs code
+    Submitted --> Rejected400: validation fails
+    Rejected400 --> [*]
+    Submitted --> PendingReview: built &amp; deployed
+    PendingReview --> Authorized: admin approve
+    PendingReview --> Unauthorized: admin reject
+    Authorized --> Invokable: forever
+    Unauthorized --> Kept: in registry, never invokable
+    Invokable --> [*]
+    Kept --> [*]
+        </pre>
+        <div class="caption">Validation rejection is the only path that doesn't persist a row. Everything past deploy lives forever.</div>
+      </div>
+
+      <h3>On-disk layout</h3>
+      <pre><code>ataf_data/
+  ataf.sqlite                  # metadata index (one row per tool)
+  tools/
+    circle_area_v1.py          # the actual generated code — git-trackable
+    rectangle_area_v1.py
+  logs/
+    deployment.jsonl           # append-only audit: propose · deploy · approve · …</code></pre>
+      <p>On startup the registry reloads every row, re-reads its <code>.py</code> file, and verifies the
+      stored <code>code_sha256</code>. A missing file or hash mismatch flips the tool to
+      <code>UNAUTHORIZED</code> with a warning — <strong>never an auto-delete</strong>.</p>
+    </section>
+
+    <!-- 8 GOVERNANCE -->
+    <section id="governance">
+      <h2><span class="num">8</span>Governance — Two-Layer Enforcement</h2>
+      <table>
+        <thead><tr><th>Status</th><th>Set by</th><th>LLM sees it as</th><th>Server allows invocation?</th></tr></thead>
+        <tbody>
+          <tr><td><span class="status pending">PENDING_REVIEW</span></td><td>Default after deploy</td><td>"Unavailable — pending review"</td><td>Config flag <code>allow_pending_invocation</code> (default <strong>false</strong>)</td></tr>
+          <tr><td><span class="status auth">AUTHORIZED</span></td><td>Human admin</td><td>Normal tool</td><td><span class="check">Yes</span></td></tr>
+          <tr><td><span class="status unauth">UNAUTHORIZED</span></td><td>Human admin</td><td>"Unavailable — rejected"</td><td><strong>No</strong></td></tr>
+        </tbody>
+      </table>
+
+      <div class="grid2">
+        <div class="tile"><h4>Layer 1 · Prompt-level</h4><p>The catalog sent to the LLM carries each <code>status</code> flag. The prompt instructs: non-<code>AUTHORIZED</code> tools are unavailable — do <em>not</em> propose a duplicate; decline instead. This prevents the duplication loop.</p></div>
+        <div class="tile"><h4>Layer 2 · Server-level</h4><p>Even if the LLM hallucinates and invokes a non-authorized tool, the server returns <code>403 TOOL_NOT_AUTHORIZED</code>. The agent forwards it; the LLM is instructed to stop calling tools and return its final answer.</p></div>
+      </div>
+      <div class="card">
+        <div class="label">Why both</div>
+        <p style="margin:6px 0 0">Layer 1 is the happy path that keeps the LLM cooperative; Layer 2 is the
+        hard safety net. <strong>v0.1 trusts the LLM is honest</strong> — code sandboxing is deferred to
+        v0.3.</p>
+      </div>
+    </section>
+
+    <!-- 9 BUILD PIPELINE -->
+    <section id="build">
+      <h2><span class="num">9</span>Build Pipeline — Inside <code>builder.py</code></h2>
+      <p>The builder is a <strong>pure, lock-free unit</strong>: it validates, generates the schema, and
+      persists. Lock acquisition and live-route registration stay in <code>main.py</code>, so the builder
+      is fully unit-testable without a running server.</p>
+
+      <div class="diagram">
+        <pre class="mermaid">
+flowchart LR
+    C["proposed code"] --> V{"static validation<br/>(AST — never exec'd)"}
+    V -- fail --> E["CodeValidationError<br/>→ 400 · agent's fault"]
+    V -- pass --> S["generate JSON schema<br/>signature + docstring"]
+    S --> ID["allocate tool_id<br/>circle_area_v1 · _v2 …"]
+    ID --> P["persist: write .py<br/>then SQLite row"]
+    P -- "disk / DB error" --> D["DeploymentError<br/>→ 500 TOOL_NOT_DEPLOYED · retryable"]
+    P --> L["log propose + deploy<br/>(deployment.jsonl)"]
+    L --> R["BuildResult<br/>PENDING_REVIEW"]
+
+    classDef ok fill:#e9f6ee,stroke:#2f855a,color:#1a1f29;
+    classDef bad fill:#fcebea,stroke:#c53030,color:#1a1f29;
+    class S,ID,P,L,R ok;
+    class E,D bad;
+        </pre>
+        <div class="caption">Two failure paths: validation rejects bad code (400); a server-side fault after validation is retryable (500 · <code>TOOL_NOT_DEPLOYED</code>).</div>
+      </div>
+
+      <div class="card">
+        <div class="label">Two kinds of failure</div>
+        <p style="margin:6px 0 0"><strong>Validation</strong> failures are the
+        <em>agent's</em> fault — malformed code — and return <code>400</code> with a specific code
+        (below). A <strong>deployment</strong> failure means valid code that the server couldn't
+        persist (disk full, locked DB); it returns <code>500 TOOL_NOT_DEPLOYED</code> and the same
+        code may succeed on retry. Both log a <code>deploy_failed</code> audit event.</p>
+      </div>
+
+      <h3>Validation rules → error codes</h3>
+      <table>
+        <thead><tr><th>Rule</th><th>Error code on failure</th></tr></thead>
+        <tbody>
+          <tr><td>Parses as valid Python</td><td><code>SYNTAX_ERROR</code></td></tr>
+          <tr><td>Exactly one top-level function</td><td><code>NOT_SINGLE_FUNCTION</code></td></tr>
+          <tr><td>Not <code>async</code></td><td><code>ASYNC_NOT_SUPPORTED</code></td></tr>
+          <tr><td>No <code>*args</code> / <code>**kwargs</code></td><td><code>VARIADIC_NOT_SUPPORTED</code></td></tr>
+          <tr><td>Return type annotation present</td><td><code>MISSING_RETURN_ANNOTATION</code></td></tr>
+          <tr><td>Every parameter annotated</td><td><code>MISSING_TYPE_ANNOTATION</code></td></tr>
+          <tr><td>Docstring present</td><td><code>MISSING_DOCSTRING</code></td></tr>
+          <tr><td>Imports are stdlib only</td><td><code>NON_STDLIB_IMPORT</code></td></tr>
+        </tbody>
+      </table>
+
+      <h3>Schema generation</h3>
+      <p>Hand-rolled from <code>ast</code> + a small Google-style docstring parser — no
+      <code>griffe</code> / <code>docstring-parser</code> dependency in v0.1. Maps Python annotations to
+      JSON-schema types (<code>int→integer</code>, <code>float→number</code>, <code>list[T]→array</code>,
+      <code>dict→object</code>), unwraps <code>Optional[T]</code> / <code>T | None</code>, and marks
+      defaulted parameters optional. Unknown annotations degrade to an unconstrained schema rather than
+      rejecting a valid tool.</p>
+    </section>
+
+    <!-- 10 STATUS -->
+    <section id="status">
+      <h2><span class="num">10</span>Build Status — v0.1</h2>
+      <div class="grid2">
+        <div class="tile">
+          <h4>Server</h4>
+          <p style="line-height:1.9">
+          <span class="check">✓</span> protocol.py — Pydantic models<br>
+          <span class="check">✓</span> storage.py — filesystem layout<br>
+          <span class="check">✓</span> registry.py — SQLite + code files<br>
+          <span class="check">✓</span> eventlog.py — JSONL audit log<br>
+          <span class="check">✓</span> lock.py — global build lock<br>
+          <span class="check">✓</span> <strong>builder.py — validate · schema · persist</strong><br>
+          <span class="todo">○</span> executor.py — subprocess runner<br>
+          <span class="todo">○</span> governance.py — status enforcement<br>
+          <span class="todo">○</span> main.py — FastAPI wiring<br>
+          <span class="todo">○</span> admin_cli.py — ataf-admin
+          </p>
+        </div>
+        <div class="tile">
+          <h4>Client &amp; tests</h4>
+          <p style="line-height:1.9">
+          <span class="todo">○</span> tag_parser.py — extract &lt;ATAF&gt; code<br>
+          <span class="todo">○</span> prompt_template.py — system prompt<br>
+          <span class="todo">○</span> llm_adapters/claude.py<br>
+          <span class="todo">○</span> agent.py — AtafAgent loop<br>
+          <span class="todo">○</span> examples/circle_area/<br>
+          <br>
+          <span class="check">✓</span> <strong>48 / 48 tests passing</strong><br>
+          <span style="color:var(--muted);font-size:13px">26 foundation + 22 builder</span>
+          </p>
+        </div>
+      </div>
+      <div class="card locked">
+        <div class="label">Exit criteria — v0.1 demo</div>
+        <p style="margin:6px 0 0">Server up → agent asks for circle area → LLM proposes the tool →
+        <code>ataf-admin approve</code> → a second run uses the deployed tool. Restart the server and
+        verify the catalog persists. Concurrency test: three agents propose simultaneously, only one
+        builds at a time, the other two wait and refresh correctly.</p>
+      </div>
+    </section>
+
+    <footer>
+      ATAF — Agent Tool Acquisition Framework · Design v1 (locked 2026-06-26) · Apache-2.0.<br>
+      <code>DESIGN.md</code> remains the single source of truth; this page is a visual companion.
+    </footer>
+  </main>
+</div>
+
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: "base",
+    themeVariables: {
+      background: "#ffffff",
+      primaryColor: "#ebf2fb",
+      primaryBorderColor: "#2b6cb0",
+      primaryTextColor: "#1a1f29",
+      lineColor: "#5b6473",
+      fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif",
+      fontSize: "15px"
+    },
+    flowchart: { useMaxWidth: true, htmlLabels: true, padding: 12, nodeSpacing: 40, rankSpacing: 50 },
+    sequence: {
+      useMaxWidth: true,
+      actorMargin: 48,
+      mirrorActors: false,
+      actorFontSize: 14,
+      messageFontSize: 13,
+      noteFontSize: 13,
+      boxMargin: 10,
+      height: 36
+    },
+    state: { useMaxWidth: true, padding: 10, nodeSpacing: 40, rankSpacing: 50 }
+  });
+</script>
+</body>
+</html>
