@@ -365,6 +365,20 @@ error to the LLM, and the prompt template instructs the LLM:
 
 Both layers must exist. Layer 1 is the happy path; Layer 2 is the safety net.
 
+### Server configuration flags
+
+Two server flags relax the default human-in-the-loop gate. Both are off by
+default; use them only with a trusted LLM.
+
+| Flag (env) | Effect |
+|------------|--------|
+| `allow_pending_invocation` (`ATAF_ALLOW_PENDING`) | A `PENDING_REVIEW` tool may be invoked without approval. Status **stays** `PENDING_REVIEW`; only the invoke check is relaxed. Try-before-approve. |
+| `auto_authorize` (`ATAF_AUTO_AUTHORIZE`) | Every newly deployed tool is **immediately marked `AUTHORIZED`** (logged as an `approve` event with `actor="auto"`). This is the fully autonomous, no-human-in-the-loop mode — the normal agent loop and governance then work with no extra flags. |
+
+The distinction: `allow_pending_invocation` is a softer "let it run but keep
+it flagged"; `auto_authorize` removes the review gate entirely by changing
+the tool's status.
+
 ---
 
 ## 7. Tool Lifecycle

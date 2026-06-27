@@ -11,6 +11,9 @@ Environment=ATAF_PORT=9123
 Environment=ATAF_DATA_DIR=/home/rajramani/ataf/ataf_data
 # Set to 1 only for demos — lets PENDING_REVIEW tools be invoked without approval.
 Environment=ATAF_ALLOW_PENDING=0
+# Autonomous mode: auto-approve every new tool (no human review). Trust the
+# LLM. Set to 0 to require `ataf-admin approve` before tools are invokable.
+Environment=ATAF_AUTO_AUTHORIZE=1
 ExecStartPre=/bin/sleep 5
 ExecStartPre=-/usr/bin/fuser -k 9123/tcp
 ExecStart=/home/rajramani/ataf/.venv/bin/python -m ataf.server.main

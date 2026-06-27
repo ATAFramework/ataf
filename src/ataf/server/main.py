@@ -63,6 +63,7 @@ def create_app(
     paths: StoragePaths | None = None,
     *,
     allow_pending_invocation: bool = False,
+    auto_authorize: bool = False,
     tool_timeout_seconds: float = 5.0,
 ) -> FastAPI:
     """Build and return a fully-wired ATAF FastAPI application.
@@ -75,8 +76,19 @@ def create_app(
         paths: Storage paths for this server's data dir. Defaults to
             ``./ataf_data`` resolved to an absolute path.
         allow_pending_invocation: If True, tools in ``PENDING_REVIEW`` may
-            be invoked without approval. Convenient for demos; unsafe for
-            real deployments (DESIGN.md §6).
+            be invoked without approval (the tool *stays* pending, it's
+            just invokable). Convenient for try-before-approve demos;
+            unsafe for real deployments (DESIGN.md §6).
+        auto_authorize: If True, every newly deployed tool is immediately
+            marked ``AUTHORIZED`` — no human review. This is the
+            "no-human-in-the-loop" mode: tools genuinely become authorized
+            (not merely invokable), so the normal agent loop and governance
+            work with no extra flags. Use only with a trusted LLM; this
+            removes the v0.1 safety gate entirely (DESIGN.md §6).
+
+            Distinct from ``allow_pending_invocation``: that leaves the
+            status PENDING and only relaxes the invoke check; this changes
+            the status to AUTHORIZED.
         tool_timeout_seconds: Per-call wall-clock budget for tool
             execution.
 
@@ -211,13 +223,24 @@ def create_app(
             # Server's fault: valid code we couldn't persist (retryable).
             return _error(500, err.code, err.message)
 
+        # The builder always deploys PENDING_REVIEW. In auto-authorize mode
+        # the server approves it immediately — same effect as a human
+        # running `ataf-admin approve`, logged with actor="auto".
+        tool_status = result.status
+        catalog_version = result.catalog_version
+        if auto_authorize:
+            registry.set_status(result.tool_id, "AUTHORIZED")
+            event_log.record("approve", tool_id=result.tool_id, actor="auto")
+            tool_status = "AUTHORIZED"
+            catalog_version = registry.catalog_version
+
         # Success — report the deployed tool to the agent.
         return ProposeDeployedResponse(
             tool_id=result.tool_id,
             input_schema=result.input_schema,
             invoke_uri=result.invoke_uri,
-            tool_status=result.status,
-            catalog_version=result.catalog_version,
+            tool_status=tool_status,
+            catalog_version=catalog_version,
         )
 
     # ------------------------------------------------------------------
@@ -345,21 +368,21 @@ def run() -> None:
         ATAF_PORT              port (default 9123)
         ATAF_DATA_DIR          data directory (default ./ataf_data)
         ATAF_ALLOW_PENDING     "1"/"true" to allow invoking PENDING tools
+        ATAF_AUTO_AUTHORIZE    "1"/"true" to auto-approve every new tool
         ATAF_TOOL_TIMEOUT      per-call timeout seconds (default 5)
     """
 
     import uvicorn
 
-    # Parse the dev-convenience flag from the environment.
-    allow_pending = os.environ.get("ATAF_ALLOW_PENDING", "").lower() in (
-        "1",
-        "true",
-        "yes",
-    )
+    # Parse the boolean convenience flags from the environment.
+    truthy = ("1", "true", "yes")
+    allow_pending = os.environ.get("ATAF_ALLOW_PENDING", "").lower() in truthy
+    auto_authorize = os.environ.get("ATAF_AUTO_AUTHORIZE", "").lower() in truthy
     tool_timeout = float(os.environ.get("ATAF_TOOL_TIMEOUT", "5"))
 
     app = create_app(
         allow_pending_invocation=allow_pending,
+        auto_authorize=auto_authorize,
         tool_timeout_seconds=tool_timeout,
     )
 

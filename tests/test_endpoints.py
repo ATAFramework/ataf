@@ -112,6 +112,26 @@ def test_allow_pending_flag_lets_invoke_through(tmp_path: Path) -> None:
     assert resp.json()["result"] == pytest.approx(12.566370, rel=1e-6)
 
 
+def test_auto_authorize_deploys_authorized_and_invokable(tmp_path: Path) -> None:
+    """With auto_authorize, a proposed tool is AUTHORIZED and immediately usable."""
+
+    client = _client(tmp_path, auto_authorize=True)
+
+    # Propose: response should already report AUTHORIZED, no human step.
+    resp = client.post("/tools/propose", json={"intent": "a", "code": CIRCLE_AREA_CODE})
+    assert resp.status_code == 200
+    assert resp.json()["tool_status"] == "AUTHORIZED"
+
+    # And it can be invoked right away.
+    invoke = client.post("/tools/circle_area_v1/invoke", json={"args": {"radius": 10}})
+    assert invoke.status_code == 200
+    assert invoke.json()["result"] == pytest.approx(314.159265, rel=1e-6)
+
+    # The catalog shows it AUTHORIZED.
+    catalog = client.get("/tools").json()
+    assert catalog["tools"][0]["status"] == "AUTHORIZED"
+
+
 def test_invoke_unknown_tool_is_404(tmp_path: Path) -> None:
     """Invoking a non-existent tool returns 404 TOOL_NOT_FOUND."""
 
