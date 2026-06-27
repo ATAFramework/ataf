@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ATAF Chat</title>
+<style>
+  :root {
+    --bg: #ffffff; --fg: #1a1f29; --muted: #5b6473; --accent: #2b6cb0;
+    --accent-soft: #ebf2fb; --border: #e2e6ec; --code-bg: #f6f8fa;
+    --ok: #2f855a; --ok-soft: #e9f6ee; --warn: #b7791f; --warn-soft: #fdf6e7;
+    --bad: #c53030; --bad-soft: #fcebea;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg); color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    display: flex; height: 100vh; overflow: hidden;
+  }
+
+  /* Sidebar */
+  aside {
+    width: 300px; flex-shrink: 0; border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; background: #fbfcfe;
+  }
+  aside header { padding: 18px 18px 12px; border-bottom: 1px solid var(--border); }
+  aside header .brand { font-weight: 700; font-size: 18px; }
+  aside header .sub { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .tools-head {
+    display: flex; justify-content: space-between; align-items: baseline;
+    padding: 14px 18px 6px; font-size: 12px; color: var(--muted);
+    text-transform: uppercase; letter-spacing: .5px; font-weight: 600;
+  }
+  #tool-count { background: var(--accent-soft); color: var(--accent);
+    border-radius: 999px; padding: 1px 8px; font-size: 11px; }
+  .tools { flex: 1; overflow-y: auto; padding: 4px 12px 16px; }
+  .tool {
+    border: 1px solid var(--border); border-radius: 8px; padding: 9px 11px;
+    margin-bottom: 8px; background: #fff;
+  }
+  .tool .name { font-weight: 600; font-size: 13.5px; word-break: break-all; }
+  .tool .desc { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .tool .params { color: var(--muted); font-size: 11px; margin-top: 4px;
+    font-family: "SF Mono", Menlo, monospace; }
+  .badge { font-size: 10px; font-weight: 700; padding: 1px 7px; border-radius: 5px;
+    text-transform: uppercase; letter-spacing: .3px; }
+  .badge.auth { background: var(--ok-soft); color: var(--ok); }
+  .badge.pending { background: var(--warn-soft); color: var(--warn); }
+  .badge.unauth { background: var(--bad-soft); color: var(--bad); }
+  .tools-empty { color: var(--muted); font-size: 13px; padding: 10px 6px; }
+  .flash { animation: flash 1.4s ease-out; }
+  @keyframes flash { 0% { background: var(--ok-soft); } 100% { background: #fff; } }
+
+  /* Chat column */
+  main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  .chat-head {
+    padding: 14px 22px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 14px;
+  }
+  .chat-head h1 { font-size: 16px; margin: 0; }
+  .chat-head .server { color: var(--muted); font-size: 12px; }
+  select {
+    margin-left: auto; font-size: 13px; padding: 6px 8px;
+    border: 1px solid var(--border); border-radius: 7px; background: #fff; color: var(--fg);
+  }
+  .messages { flex: 1; overflow-y: auto; padding: 22px; display: flex; flex-direction: column; gap: 14px; }
+  .msg { max-width: 76%; padding: 11px 15px; border-radius: 12px; font-size: 14.5px; line-height: 1.5; white-space: pre-wrap; }
+  .msg.user { align-self: flex-end; background: var(--accent); color: #fff; border-bottom-right-radius: 4px; }
+  .msg.bot { align-self: flex-start; background: var(--code-bg); border: 1px solid var(--border); border-bottom-left-radius: 4px; }
+  .msg.bot.declined { background: var(--warn-soft); border-color: #f0e2c4; }
+  .msg.bot.error { background: var(--bad-soft); border-color: #f3d2d0; }
+  .trace { margin-top: 8px; font-size: 12px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { background: #fff; border: 1px solid var(--border); border-radius: 999px; padding: 1px 9px; }
+  .chip.built { border-color: #c6e8d3; color: var(--ok); }
+  .chip.called { border-color: #cfe0f3; color: var(--accent); }
+  .thinking { align-self: flex-start; color: var(--muted); font-size: 13px; font-style: italic; }
+
+  /* Composer */
+  .composer { border-top: 1px solid var(--border); padding: 14px 22px; display: flex; gap: 10px; }
+  textarea {
+    flex: 1; resize: none; font: inherit; font-size: 14.5px; padding: 11px 13px;
+    border: 1px solid var(--border); border-radius: 10px; color: var(--fg); height: 46px; max-height: 160px;
+  }
+  textarea:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
+  button {
+    background: var(--accent); color: #fff; border: none; border-radius: 10px;
+    padding: 0 20px; font-size: 14.5px; font-weight: 600; cursor: pointer;
+  }
+  button:disabled { opacity: .5; cursor: default; }
+</style>
+</head>
+<body>
+  <aside>
+    <header>
+      <div class="brand">ATAF</div>
+      <div class="sub">Agent Tool Acquisition Framework</div>
+    </header>
+    <div class="tools-head"><span>Available tools</span><span id="tool-count">0</span></div>
+    <div class="tools" id="tools"><div class="tools-empty">Loading…</div></div>
+  </aside>
+
+  <main>
+    <div class="chat-head">
+      <h1>Chat</h1>
+      <span class="server" id="server"></span>
+      <select id="policy" title="Tool-use policy">
+        <option value="PREFER_NEWTOOL">PREFER_NEWTOOL</option>
+        <option value="MODEL_DECIDES_NEWTOOL">MODEL_DECIDES_NEWTOOL</option>
+        <option value="REQUIRE_NEWTOOL">REQUIRE_NEWTOOL</option>
+        <option value="USE_ONLY_EXISTINGTOOL">USE_ONLY_EXISTINGTOOL</option>
+      </select>
+    </div>
+
+    <div class="messages" id="messages">
+      <div class="msg bot">Ask me something — e.g. <em>"What's the area of a circle with radius 11?"</em> If I don't have a tool for it, I'll write one. Watch the sidebar.</div>
+    </div>
+
+    <div class="composer">
+      <textarea id="input" placeholder="Type a task and press Enter…" rows="1"></textarea>
+      <button id="send">Send</button>
+    </div>
+  </main>
+
+<script>
+  const messagesEl = document.getElementById('messages');
+  const inputEl = document.getElementById('input');
+  const sendBtn = document.getElementById('send');
+  const policyEl = document.getElementById('policy');
+  const toolsEl = document.getElementById('tools');
+  const countEl = document.getElementById('tool-count');
+
+  let knownToolIds = new Set();
+
+  // --- Tools sidebar: poll the proxied catalog and render it. ---
+  function badgeClass(status) {
+    if (status === 'AUTHORIZED') return 'auth';
+    if (status === 'PENDING_REVIEW') return 'pending';
+    return 'unauth';
+  }
+
+  async function refreshTools() {
+    try {
+      const res = await fetch('/api/tools');
+      const data = await res.json();
+      renderTools(data.tools || []);
+    } catch (e) { /* leave the last render in place */ }
+  }
+
+  function renderTools(tools) {
+    countEl.textContent = tools.length;
+    if (!tools.length) {
+      toolsEl.innerHTML = '<div class="tools-empty">No tools yet. Ask for something that needs one.</div>';
+      return;
+    }
+    toolsEl.innerHTML = '';
+    for (const t of tools) {
+      const isNew = !knownToolIds.has(t.tool_id);
+      const params = Object.keys((t.input_schema && t.input_schema.properties) || {});
+      const el = document.createElement('div');
+      el.className = 'tool' + (isNew && knownToolIds.size ? ' flash' : '');
+      el.innerHTML =
+        `<div class="name">${t.tool_id} <span class="badge ${badgeClass(t.status)}">${t.status}</span></div>` +
+        `<div class="desc">${escapeHtml(t.description || '')}</div>` +
+        (params.length ? `<div class="params">(${params.join(', ')})</div>` : '');
+      toolsEl.appendChild(el);
+    }
+    knownToolIds = new Set(tools.map(t => t.tool_id));
+  }
+
+  function escapeHtml(s) {
+    return s.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  }
+
+  // --- Chat ---
+  function addMessage(text, cls) {
+    const el = document.createElement('div');
+    el.className = 'msg ' + cls;
+    el.textContent = text;
+    messagesEl.appendChild(el);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+    return el;
+  }
+
+  function addTrace(el, proposed, invoked) {
+    if (!proposed.length && !invoked.length) return;
+    const trace = document.createElement('div');
+    trace.className = 'trace';
+    for (const id of proposed) trace.innerHTML += `<span class="chip built">🔧 built ${id}</span>`;
+    for (const id of invoked) trace.innerHTML += `<span class="chip called">▶ called ${id}</span>`;
+    el.appendChild(trace);
+  }
+
+  async function send() {
+    const message = inputEl.value.trim();
+    if (!message) return;
+    inputEl.value = '';
+    inputEl.style.height = '46px';
+    addMessage(message, 'user');
+    sendBtn.disabled = true;
+
+    const thinking = document.createElement('div');
+    thinking.className = 'thinking';
+    thinking.textContent = 'thinking…';
+    messagesEl.appendChild(thinking);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ message, policy: policyEl.value }),
+      });
+      const data = await res.json();
+      thinking.remove();
+
+      let cls = 'bot', text;
+      if (data.error) { cls += ' error'; text = data.error; }
+      else if (data.outcome === 'DECLINED') { cls += ' declined'; text = `Declined: ${data.decline_code}`; }
+      else if (data.outcome === 'PROTOCOL_ERROR' || data.outcome === 'SERVER_ERROR') { cls += ' error'; text = data.answer; }
+      else { text = data.answer || '(no answer)'; }
+
+      const el = addMessage(text, cls);
+      addTrace(el, data.tools_proposed || [], data.tools_invoked || []);
+    } catch (e) {
+      thinking.remove();
+      addMessage('Request failed: ' + e, 'bot error');
+    } finally {
+      sendBtn.disabled = false;
+      // The agent may have added tools — refresh the sidebar right away.
+      refreshTools();
+    }
+  }
+
+  sendBtn.addEventListener('click', send);
+  inputEl.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+  });
+  inputEl.addEventListener('input', () => {
+    inputEl.style.height = '46px';
+    inputEl.style.height = Math.min(inputEl.scrollHeight, 160) + 'px';
+  });
+
+  // Poll the catalog every 3s plus an immediate first load.
+  refreshTools();
+  setInterval(refreshTools, 3000);
+</script>
+</body>
+</html>
