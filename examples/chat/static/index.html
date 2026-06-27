@@ -39,12 +39,14 @@
     border: 1px solid var(--border); border-radius: 8px; padding: 9px 11px;
     margin-bottom: 8px; background: #fff;
   }
-  .tool .name { font-weight: 600; font-size: 13.5px; word-break: break-all; }
+  .tool .name { font-weight: 600; font-size: 13.5px; display: flex;
+    align-items: center; gap: 6px; flex-wrap: wrap; }
+  .tool .name .id { word-break: break-all; }
   .tool .desc { color: var(--muted); font-size: 12px; margin-top: 2px; }
   .tool .params { color: var(--muted); font-size: 11px; margin-top: 4px;
     font-family: "SF Mono", Menlo, monospace; }
   .badge { font-size: 10px; font-weight: 700; padding: 1px 7px; border-radius: 5px;
-    text-transform: uppercase; letter-spacing: .3px; }
+    text-transform: uppercase; letter-spacing: .3px; white-space: nowrap; }
   .badge.auth { background: var(--ok-soft); color: var(--ok); }
   .badge.pending { background: var(--warn-soft); color: var(--warn); }
   .badge.unauth { background: var(--bad-soft); color: var(--bad); }
@@ -160,7 +162,7 @@
       const el = document.createElement('div');
       el.className = 'tool' + (isNew && knownToolIds.size ? ' flash' : '');
       el.innerHTML =
-        `<div class="name">${t.tool_id} <span class="badge ${badgeClass(t.status)}">${t.status}</span></div>` +
+        `<div class="name"><span class="id">${t.tool_id}</span> <span class="badge ${badgeClass(t.status)}">${t.status}</span></div>` +
         `<div class="desc">${escapeHtml(t.description || '')}</div>` +
         (params.length ? `<div class="params">(${params.join(', ')})</div>` : '');
       toolsEl.appendChild(el);
