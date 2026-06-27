@@ -8,8 +8,13 @@ live FastAPI endpoint. The agent re-prompts the LLM with the refreshed
 catalog and continues. Tools persist across restarts and are shared
 across all agents talking to the same server.
 
-> **Status:** Design v1 locked (2026-06-26). Implementation queued for
-> v0.1 MVP. Not yet runnable.
+> **Status:** v0.1 in progress. Server layer is implemented and runnable
+> (registry, build lock, builder, executor, governance, FastAPI app +
+> `ataf-admin` CLI; 71 tests). The LLM-driven agent client is the
+> remaining v0.1 work.
+
+📐 **[Interactive design doc →](https://ataframework.github.io/ataf/concept.html)**
+(diagrams, wire protocol, lifecycle — rendered from `concept.html`)
 
 ---
 
@@ -59,7 +64,9 @@ LLM    ── invokes new tool ───▶  Agent ──▶ ATAF ──▶ resu
   no native tool-use extensions required.
 
 Full architecture, wire protocol, concurrency model, and governance
-model are in [DESIGN.md](DESIGN.md).
+model are in [DESIGN.md](DESIGN.md) — or browse the
+[interactive design doc](https://ataframework.github.io/ataf/concept.html)
+for the same material with rendered diagrams.
 
 ## Phased roadmap
 

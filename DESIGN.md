@@ -121,14 +121,49 @@ def circle_area(radius: float) -> float:
 Please deploy this and call it with radius=10.
 ```
 
-### Response 3 — Decline
+### Response 3 — Decline (with a structured reason code)
+
+The LLM declines by emitting exactly one of these reason codes. The agent
+treats every decline code as **terminal** and halts the loop — it never
+retries (re-prompting would just produce duplicate proposals).
+
+| Reason code | Meaning |
+|-------------|---------|
+| `CANNOT_IMPLEMENT_TOOL_EXISTS_BUT_UNAUTHORIZED` | A matching tool already exists but is `PENDING_REVIEW` or `UNAUTHORIZED`. The LLM must NOT propose a duplicate — it declines with this code. This is also the correct terminal state after the LLM proposes a tool and, on the refreshed re-prompt, sees its own just-built tool is still pending review. |
+| `CANNOT_IMPLEMENT_NOT_CAPABLE` | No suitable tool exists, proposing is allowed, but the LLM cannot write the tool. |
+| `CANNOT_IMPLEMENT_NO_AUTHORIZED_TOOL` | Tool proposal is disabled by policy (`USE_ONLY_EXISTINGTOOL`) and no `AUTHORIZED` tool fits the task. |
 
 ```
-I cannot do this task with the available tools, and I cannot write
-a tool that would do it either.
+CANNOT_IMPLEMENT_NOT_CAPABLE: I cannot do this task with the available
+tools, and I cannot write a tool that would do it either.
 ```
 
-The agent halts the loop on Response 3.
+### Response 4 — Direct answer (prose)
+
+The LLM answers the task directly in natural language, without using or
+proposing a tool. Whether this is permitted depends on the **client
+tool-use policy** (see §3.1); under the strict policies a direct answer
+to a task request is a protocol violation, not a valid response.
+
+### 3.1 Client tool-use policy
+
+How aggressively the agent steers the LLM toward tools is a **client-side
+policy**, passed to the agent (`tool_policy=`). It shapes the RULES block
+injected into the prompt (§8.5) and how the loop reacts to each response.
+The server is unchanged — policy lives entirely in the client.
+
+| Policy | Use authorized tool | Propose new tool | Direct prose answer |
+|--------|:---:|:---:|:---:|
+| `MODEL_DECIDES_NEWTOOL` | yes | yes | yes |
+| `PREFER_NEWTOOL` (default) | yes | yes (steered) | yes (may be logged) |
+| `REQUIRE_NEWTOOL` | yes | yes (required if none fits) | no → protocol error |
+| `USE_ONLY_EXISTINGTOOL` | yes | **never** | no → protocol error |
+
+Under `REQUIRE_NEWTOOL` / `USE_ONLY_EXISTINGTOOL`, the only valid
+responses are: use an AUTHORIZED tool, propose a new tool (where allowed),
+or decline with a Response-3 code. If the LLM instead emits off-contract
+prose, the agent surfaces a **hard protocol error** to the caller — it
+does not silently accept it and does not re-prompt.
 
 ---
 
@@ -524,6 +559,9 @@ answer = agent.run("Calculate the area of a circle with radius 10.")
 
 ### 8.5 Canonical LLM prompt template (v1)
 
+The `{policy_rules}` block is injected by the client based on the active
+`tool_policy` (§3.1), so the same template serves all four policies.
+
 ```
 You are an agent with access to a dynamic toolset managed by ATAF.
 
@@ -534,10 +572,9 @@ RULES:
 1. To use an AUTHORIZED tool, call it in your native tool-use format.
 2. Tools with status PENDING_REVIEW or UNAUTHORIZED are unavailable.
    Do NOT propose a duplicate of a non-AUTHORIZED tool that matches the
-   user's request. Instead, respond with: "Cannot complete this task —
-   required tool is pending review."
-3. If no AUTHORIZED tool fits AND no PENDING_REVIEW tool matches, you
-   may propose a new tool by emitting:
+   user's request. Instead, decline with:
+   CANNOT_IMPLEMENT_TOOL_EXISTS_BUT_UNAUTHORIZED
+3. To propose a new tool (when policy allows), emit:
 
        <ATAF param="newtool">
        def my_tool(arg1: type, ...) -> return_type:
@@ -559,13 +596,41 @@ RULES:
    - Pure function preferred; no global state
 
 4. If a tool invocation returns TOOL_NOT_AUTHORIZED, stop calling tools
-   and give the user your best non-tool answer.
+   and decline with CANNOT_IMPLEMENT_TOOL_EXISTS_BUT_UNAUTHORIZED.
 
-5. If no tool exists and you cannot write one, respond with:
-   "I cannot complete this task."
+5. To decline, respond with exactly one reason code on its own line:
+   - CANNOT_IMPLEMENT_TOOL_EXISTS_BUT_UNAUTHORIZED — a matching tool
+     exists but is not AUTHORIZED (do not duplicate it).
+   - CANNOT_IMPLEMENT_NOT_CAPABLE — no tool fits and you cannot write one.
+   - CANNOT_IMPLEMENT_NO_AUTHORIZED_TOOL — proposing is disabled and no
+     AUTHORIZED tool fits.
+
+{policy_rules}
 
 USER TASK:
 {user_task}
+```
+
+The `{policy_rules}` injected per policy:
+
+```
+MODEL_DECIDES_NEWTOOL:
+  6. You MAY answer directly in prose if that is the best response.
+
+PREFER_NEWTOOL (default):
+  6. For any calculation, data lookup, or operation where a precise or
+     repeatable result matters, prefer using an AUTHORIZED tool or
+     proposing a new one over answering from your own reasoning. You may
+     still answer directly for purely conversational replies.
+
+REQUIRE_NEWTOOL:
+  6. You MUST use an AUTHORIZED tool, propose a new tool, or decline with
+     a reason code. Do NOT answer a task request directly in prose.
+
+USE_ONLY_EXISTINGTOOL:
+  6. You MUST use an AUTHORIZED tool or decline. You may NOT propose new
+     tools. If no AUTHORIZED tool fits, decline with
+     CANNOT_IMPLEMENT_NO_AUTHORIZED_TOOL.
 ```
 
 ---

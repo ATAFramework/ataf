@@ -194,8 +194,9 @@
     <a href="#concurrency">6 · Concurrency</a>
     <a href="#lifecycle">7 · Tool Lifecycle</a>
     <a href="#governance">8 · Governance</a>
-    <a href="#build">9 · Build · Pipeline</a>
-    <a href="#status">10 · Status</a>
+    <a href="#policy">9 · Tool-Use Policy</a>
+    <a href="#build">10 · Build · Pipeline</a>
+    <a href="#status">11 · Status</a>
   </nav>
 
   <main>
@@ -520,9 +521,56 @@ stateDiagram-v2
       </div>
     </section>
 
-    <!-- 9 BUILD PIPELINE -->
+    <!-- 9 TOOL-USE POLICY -->
+    <section id="policy">
+      <h2><span class="num">9</span>Tool-Use Policy — Agent-Side Steering</h2>
+      <p>Governance (§8) is what the <em>server</em> enforces. <strong>Policy</strong> is the
+      complementary <em>client</em>-side knob: how hard the agent steers the LLM toward tools in the
+      first place. It's a single argument — <code>tool_policy</code> — passed to the agent; it shapes
+      the prompt's RULES block and how the loop reacts to each response. The server is unchanged.</p>
+
+      <table>
+        <thead><tr><th>Policy</th><th>Use authorized tool</th><th>Propose new tool</th><th>Direct prose answer</th></tr></thead>
+        <tbody>
+          <tr><td><code>MODEL_DECIDES_NEWTOOL</code></td><td><span class="check">✓</span></td><td><span class="check">✓</span></td><td><span class="check">✓</span></td></tr>
+          <tr><td><code>PREFER_NEWTOOL</code> <em>(default)</em></td><td><span class="check">✓</span></td><td><span class="check">✓</span> steered</td><td><span class="check">✓</span> may be logged</td></tr>
+          <tr><td><code>REQUIRE_NEWTOOL</code></td><td><span class="check">✓</span></td><td><span class="check">✓</span> required if none fits</td><td><span class="status unauth">no → error</span></td></tr>
+          <tr><td><code>USE_ONLY_EXISTINGTOOL</code></td><td><span class="check">✓</span></td><td><strong>never</strong></td><td><span class="status unauth">no → error</span></td></tr>
+        </tbody>
+      </table>
+
+      <h3>The refined response contract — four responses</h3>
+      <p>The original three-response contract (use / propose / decline) gains an explicit fourth:
+      a plain prose answer. Which responses are legal depends on the policy above.</p>
+      <div class="grid2">
+        <div class="tile"><div class="ico">①</div><h4>Use authorized tool</h4><p>Native tool-call. Always allowed.</p></div>
+        <div class="tile"><div class="ico">②</div><h4>Propose new tool</h4><p><code>&lt;ATAF&gt;</code> code. Disabled under <code>USE_ONLY_EXISTINGTOOL</code>.</p></div>
+        <div class="tile"><div class="ico">③</div><h4>Decline (reason code)</h4><p>One structured code (below). <strong>Terminal</strong> — the agent gives up, never retries.</p></div>
+        <div class="tile"><div class="ico">④</div><h4>Direct prose answer</h4><p>Allowed only under the two lenient policies; a protocol error under the strict two.</p></div>
+      </div>
+
+      <h3>Structured decline codes</h3>
+      <table>
+        <thead><tr><th>Code</th><th>When</th></tr></thead>
+        <tbody>
+          <tr><td><code>CANNOT_IMPLEMENT_TOOL_EXISTS_BUT_UNAUTHORIZED</code></td><td>A matching tool exists but is <code>PENDING_REVIEW</code>/<code>UNAUTHORIZED</code> — don't duplicate it. Also the terminal state after proposing a tool that lands in pending review.</td></tr>
+          <tr><td><code>CANNOT_IMPLEMENT_NOT_CAPABLE</code></td><td>No tool fits, proposing is allowed, but the LLM can't write it.</td></tr>
+          <tr><td><code>CANNOT_IMPLEMENT_NO_AUTHORIZED_TOOL</code></td><td><code>USE_ONLY_EXISTINGTOOL</code>: proposing disabled and nothing authorized fits.</td></tr>
+        </tbody>
+      </table>
+
+      <div class="card">
+        <div class="label">No retries, no tool spam</div>
+        <p style="margin:6px 0 0">Decline codes are <strong>terminal</strong> — the agent halts immediately.
+        The normal <code>propose → build → re-prompt → use</code> path is a single forward pass, not a
+        retry loop. Under the strict policies, off-contract prose is surfaced as a <strong>hard protocol
+        error</strong> to the caller — never silently accepted, never re-prompted.</p>
+      </div>
+    </section>
+
+    <!-- 10 BUILD PIPELINE -->
     <section id="build">
-      <h2><span class="num">9</span>Build Pipeline — Inside <code>builder.py</code></h2>
+      <h2><span class="num">10</span>Build Pipeline — Inside <code>builder.py</code></h2>
       <p>The builder is a <strong>pure, lock-free unit</strong>: it validates, generates the schema, and
       persists. Lock acquisition and live-route registration stay in <code>main.py</code>, so the builder
       is fully unit-testable without a running server.</p>
@@ -580,9 +628,9 @@ flowchart LR
       rejecting a valid tool.</p>
     </section>
 
-    <!-- 10 STATUS -->
+    <!-- 11 STATUS -->
     <section id="status">
-      <h2><span class="num">10</span>Build Status — v0.1</h2>
+      <h2><span class="num">11</span>Build Status — v0.1</h2>
       <div class="grid2">
         <div class="tile">
           <h4>Server</h4>
@@ -592,24 +640,26 @@ flowchart LR
           <span class="check">✓</span> registry.py — SQLite + code files<br>
           <span class="check">✓</span> eventlog.py — JSONL audit log<br>
           <span class="check">✓</span> lock.py — global build lock<br>
-          <span class="check">✓</span> <strong>builder.py — validate · schema · persist</strong><br>
-          <span class="todo">○</span> executor.py — subprocess runner<br>
-          <span class="todo">○</span> governance.py — status enforcement<br>
-          <span class="todo">○</span> main.py — FastAPI wiring<br>
-          <span class="todo">○</span> admin_cli.py — ataf-admin
+          <span class="check">✓</span> builder.py — validate · schema · persist<br>
+          <span class="check">✓</span> executor.py — subprocess runner<br>
+          <span class="check">✓</span> governance.py — status enforcement<br>
+          <span class="check">✓</span> main.py — FastAPI wiring (serves /docs)<br>
+          <span class="check">✓</span> admin_cli.py — ataf-admin<br>
+          <span style="color:var(--muted);font-size:13px">deployed · 192.168.1.156:9123</span>
           </p>
         </div>
         <div class="tile">
           <h4>Client &amp; tests</h4>
           <p style="line-height:1.9">
-          <span class="todo">○</span> tag_parser.py — extract &lt;ATAF&gt; code<br>
-          <span class="todo">○</span> prompt_template.py — system prompt<br>
-          <span class="todo">○</span> llm_adapters/claude.py<br>
-          <span class="todo">○</span> agent.py — AtafAgent loop<br>
-          <span class="todo">○</span> examples/circle_area/<br>
+          <span class="check">✓</span> policy.py — 4 tool policies<br>
+          <span class="check">✓</span> tag_parser.py — &lt;ATAF&gt; + decline codes<br>
+          <span class="check">✓</span> prompt_template.py — policy-aware<br>
+          <span class="check">✓</span> llm_adapters — base + Claude<br>
+          <span class="check">✓</span> agent.py — AtafAgent loop<br>
+          <span class="check">✓</span> examples/circle_area/<br>
           <br>
-          <span class="check">✓</span> <strong>48 / 48 tests passing</strong><br>
-          <span style="color:var(--muted);font-size:13px">26 foundation + 22 builder</span>
+          <span class="check">✓</span> <strong>96 / 96 tests passing</strong><br>
+          <span style="color:var(--muted);font-size:13px">71 server + 25 client</span>
           </p>
         </div>
       </div>
